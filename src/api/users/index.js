@@ -2,6 +2,7 @@ import express from "express"
 import createError from "http-errors"
 import { adminOnlyMiddleware } from "../../lib/auth/admin.js"
 import { basicAuthMiddleware } from "../../lib/auth/basic.js"
+import { createAccessToken } from "../../lib/auth/tools.js"
 import UsersModel from "./model.js"
 
 const usersRouter = express.Router()
@@ -88,6 +89,27 @@ usersRouter.delete("/:userId", basicAuthMiddleware, adminOnlyMiddleware, async (
       res.status(204).send()
     } else {
       next(createError(404, `User with id ${req.params.userId} not found!`))
+    }
+  } catch (error) {
+    next(error)
+  }
+})
+
+usersRouter.post("/login", async (req, res, next) => {
+  try {
+    // 1. Obtain credentials from req.body
+    const { email, password } = req.body
+
+    // 2. Verify credentials
+    const user = await UsersModel.checkCredentials(email, password)
+
+    if (user) {
+      // 3. If credentials are fine --> generate an access token (JWT) and send it back as a response
+      const token = await createAccessToken({ _id: user._id })
+      res.send({ accessToken: token })
+    } else {
+      // 4. If credentials are NOT ok --> throw an error (401)
+      next(createError(401, "Credentials are not ok!"))
     }
   } catch (error) {
     next(error)
